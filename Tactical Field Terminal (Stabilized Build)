@@ -1,11 +1,12 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MATS TACTICAL LIVE</title>
+    <title>MATS TACTICAL COMMAND</title>
     
-    <!-- Leaflet & Plugins -->
+    <!-- Core Map Engine -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
@@ -15,132 +16,135 @@
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
-        #map { width: 100%; height: 100%; z-index: 1; }
+        /* Force screen to fit mobile perfectly */
+        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; }
+        #map { width: 100%; height: 100%; z-index: 10; }
 
-        /* FORCE UI TO TOP */
-        .ui-layer { position: absolute; z-index: 9999; pointer-events: none; width: 100%; height: 100%; top: 0; left: 0; }
-        .interactive { pointer-events: auto; }
-
-        /* WIND ARROW: FLUORESCENT ORANGE */
-        #wind-container { position: absolute; top: 100px; right: 20px; text-align: center; }
-        #wind-arrow { 
-            font-size: 70px; color: #ff6600; 
-            text-shadow: 0 0 15px #ff6600, 0 0 5px #000; 
-            display: inline-block; transform: rotate(-45deg); 
+        /* FLOATING WIND ARROW: FLUORESCENT ORANGE */
+        #wind-box {
+            position: absolute; top: 100px; right: 15px; z-index: 9999;
+            text-align: center; pointer-events: none;
         }
-        .wind-label { color: #ff6600; font-weight: bold; background: rgba(0,0,0,0.8); padding: 2px 10px; border-radius: 5px; font-family: monospace; }
-
-        /* TACTICAL HUD BUTTONS */
-        .hud-bar { 
-            position: absolute; bottom: 40px; left: 0; width: 100%; 
-            display: flex; justify-content: center; gap: 10px; 
+        #wind-arrow {
+            font-size: 80px; color: #ff6600; /* Fluorescent Orange */
+            text-shadow: 0 0 20px #ff6600, 2px 2px 5px #000;
+            display: inline-block; transform: rotate(-45deg);
         }
-        .t-btn { 
-            background: #111; color: #d4af37; border: 2px solid #d4af37; 
-            padding: 15px; font-weight: bold; border-radius: 8px; cursor: pointer;
-            box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
-        }
-        .t-reset { background: #600; color: #fff; border-color: #fff; }
+        .wind-txt { color: #ff6600; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px; border-radius: 5px; border: 1px solid #ff6600; }
 
-        /* PERIMETER CORNERS */
+        /* PERIMETER: LARGE RED CORNER DOTS */
         .leaflet-editing-icon {
-            background: #ff0000 !important; border: 2px solid #fff !important;
-            width: 22px !important; height: 22px !important;
-            margin-left: -11px !important; margin-top: -11px !important;
-            border-radius: 50% !important;
+            background: #ff0000 !important; border: 3px solid #fff !important;
+            width: 30px !important; height: 30px !important;
+            margin-left: -15px !important; margin-top: -15px !important;
+            border-radius: 50% !important; box-shadow: 0 0 20px #f00 !important;
         }
 
-        /* GPS LIVE DOT */
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 white; } 70% { box-shadow: 0 0 0 15px rgba(255,255,255,0); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } }
-        .gps-dot { width: 18px; height: 18px; background: #00f; border: 3px solid #fff; border-radius: 50%; animation: pulse 1.5s infinite; }
+        /* LIVE GPS DOT: BLUE & WHITE FLASHING */
+        @keyframes pulse-white {
+            0% { box-shadow: 0 0 0 0px rgba(255, 255, 255, 1); }
+            70% { box-shadow: 0 0 0 25px rgba(255, 255, 255, 0); }
+            100% { box-shadow: 0 0 0 0px rgba(255, 255, 255, 0); }
+        }
+        .gps-live {
+            width: 25px; height: 25px; background: #0000ff; border: 5px solid #ffffff;
+            border-radius: 50%; animation: pulse-white 1.2s infinite; z-index: 10000;
+        }
+
+        /* TACTICAL COMMAND BAR - FORCED VISIBILITY */
+        .command-bar {
+            position: absolute; bottom: 30px; left: 0; width: 100%;
+            z-index: 99999; display: flex; justify-content: center; gap: 5px; padding: 10px;
+            background: rgba(0,0,0,0.5);
+        }
+        .cmd-btn {
+            background: #111; color: #d4af37; border: 3px solid #d4af37;
+            padding: 18px 10px; font-weight: bold; border-radius: 8px; cursor: pointer;
+            font-size: 12px; text-transform: uppercase; flex-grow: 1;
+            box-shadow: 0px 5px 15px rgba(0,0,0,0.5);
+        }
+        .btn-perimeter { background: #400; border-color: #f00; color: #fff; }
+        .btn-reset { background: #800; border-color: #fff; color: #fff; }
+
+        /* RED FLAG PROPERTY ICON */
+        .prop-flag { font-size: 45px; filter: drop-shadow(3px 3px 3px #000); }
     </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<!-- UI LAYER -->
-<div class="ui-layer">
-    <!-- Wind Arrow -->
-    <div id="wind-container">
-        <div id="wind-arrow">⬆</div><br>
-        <span class="wind-label">WIND: NW 8MPH</span>
-    </div>
+<!-- FORCED UI ELEMENTS -->
+<div id="wind-box">
+    <div id="wind-arrow">⬆</div><br>
+    <span class="wind-txt">WIND: NW 8MPH</span>
+</div>
 
-    <!-- Bottom Buttons -->
-    <div class="hud-bar interactive">
-        <button class="t-btn" onclick="setTMode('LE')">BLUE LE</button>
-        <button class="t-btn" onclick="setTMode('K9')">LT BLUE K9</button>
-        <button class="t-btn" onclick="setTMode('FLAG')">🚩 FLAG</button>
-        <button class="t-btn t-reset" onclick="clearMap()">RESET ALL</button>
-    </div>
+<div class="command-bar">
+    <button class="cmd-btn btn-perimeter" onclick="drawSector()">DRAW PERIMETER</button>
+    <button class="cmd-btn" onclick="setTMode('LE')">BLUE LE</button>
+    <button class="cmd-btn" onclick="setTMode('K9')">K9 UNIT</button>
+    <button class="cmd-btn" onclick="setTMode('FLAG')">🚩 PROPERTY</button>
+    <button class="cmd-btn btn-reset" onclick="clearField()">RESET</button>
 </div>
 
 <script>
+    // Initialize Map with Address Search
     var map = L.map('map', { zoomControl: false }).setView([37.4137, -79.1422], 14);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(map);
-    
-    // Address Search
-    L.Control.geocoder({ position: 'topleft', placeholder: 'SEARCH ADDRESS' }).addTo(map);
+    L.Control.geocoder({ position: 'topleft' }).addTo(map);
 
     var searchers = L.layerGroup().addTo(map);
-    var perimeter = new L.FeatureGroup().addTo(map);
+    var perimeters = new L.FeatureGroup().addTo(map);
     var tMode = 'LE';
 
-    // 1. Perimeter Tool Logic
-    var drawControl = new L.Control.Draw({
-        edit: { featureGroup: perimeter },
-        draw: {
-            polygon: { shapeOptions: { color: '#ff0000', weight: 5 } },
-            rectangle: { shapeOptions: { color: '#ff0000', weight: 5 } },
-            polyline: false, circle: false, marker: false, circlemarker: false
+    // 1. LIVE GPS (Blue/White Dot)
+    var userPos = null;
+    map.locate({ watch: true, enableHighAccuracy: true });
+    map.on('locationfound', function(e) {
+        if (!userPos) {
+            userPos = L.marker(e.latlng, { icon: L.divIcon({ className: 'gps-live' }) }).addTo(map);
+            map.setView(e.latlng, 17);
+        } else {
+            userPos.setLatLng(e.latlng);
         }
     });
-    map.addControl(drawControl);
-    map.on(L.Draw.Event.CREATED, function (e) { perimeter.addLayer(e.layer); });
 
-    // 2. Marker Logic
-    window.setTMode = function(m) { tMode = m; };
-    
+    // 2. PERIMETER DRAW (Red Corners)
+    var polyDraw = new L.Draw.Polygon(map, {
+        shapeOptions: { color: '#ff0000', weight: 6, fillOpacity: 0.3 }
+    });
+    window.drawSector = function() { polyDraw.enable(); };
+    map.on(L.Draw.Event.CREATED, function (e) { perimeters.addLayer(e.layer); });
+
+    // 3. SEARCHER ADD/DELETE
+    window.setTMode = function(mode) { tMode = mode; };
     map.on('click', function(e) {
         var marker;
-        if(tMode === 'FLAG') {
-            marker = L.marker(e.latlng, { icon: L.divIcon({ html: '🚩', className: '', iconSize: [30,30], iconAnchor: [15,30] }) });
+        if (tMode === 'FLAG') {
+            marker = L.marker(e.latlng, { icon: L.divIcon({ className: 'prop-flag', html: '🚩', iconSize: [50,50], iconAnchor: [25,50] }) });
         } else if (tMode === 'K9') {
-            marker = L.circleMarker(e.latlng, { radius: 12, fillColor: '#add8e6', color: '#00f', fillOpacity: 1, weight: 3 });
+            marker = L.circleMarker(e.latlng, { radius: 18, fillColor: '#add8e6', color: '#0000ff', weight: 5, fillOpacity: 1 });
         } else {
-            marker = L.circleMarker(e.latlng, { radius: 12, fillColor: '#00f', color: '#fff', fillOpacity: 1, weight: 3 });
+            marker = L.circleMarker(e.latlng, { radius: 18, fillColor: '#0000ff', color: '#fff', weight: 5, fillOpacity: 1 });
         }
-        
-        // Remove individual searcher on tap
+
+        // Tap dot again to REMOVE/DELETE
         marker.on('click', function() { searchers.removeLayer(marker); });
         searchers.addLayer(marker);
     });
 
-    // 3. Reset All
-    window.clearMap = function() {
-        if(confirm("CLEAR ALL FIELD DATA?")) {
-            perimeter.clearLayers();
+    // 4. GLOBAL RESET
+    window.clearField = function() {
+        if(confirm("WIPE ENTIRE SCENE?")) {
+            perimeters.clearLayers();
             searchers.clearLayers();
         }
     };
-
-    // 4. GPS Live Following
-    var gpsMarker = null;
-    map.locate({ watch: true, enableHighAccuracy: true });
-    map.on('locationfound', function(e) {
-        if(!gpsMarker) {
-            gpsMarker = L.marker(e.latlng, { icon: L.divIcon({ className: 'gps-dot' }) }).addTo(map);
-            map.setView(e.latlng, 16);
-        } else {
-            gpsMarker.setLatLng(e.latlng);
-        }
-    });
 </script>
 
-<div style="position: absolute; bottom: 5px; width: 100%; text-align: center; color: #d4af37; font-size: 10px; z-index: 10000; pointer-events: none;">
-    App Created by Retired Deputy Sheriff EARL A. WOOD
+<div style="position: absolute; bottom: 5px; width: 100%; text-align: center; color: #d4af37; font-size: 10px; z-index: 999999;">
+    Tactical Terminal - Retired Deputy Sheriff EARL A. WOOD
 </div>
 
 </body>
