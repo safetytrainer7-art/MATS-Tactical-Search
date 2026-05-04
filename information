@@ -1,0 +1,72 @@
+<!-- [Previous Header & CSS Remains the same] -->
+<style>
+    /* New Property Input Styling */
+    .property-input {
+        background: #222; border: 1px solid #d4af37; color: #fff;
+        padding: 10px; width: 90%; margin: 10px 0; border-radius: 4px;
+    }
+    .add-prop-btn { background: #d4af37; color: #000; font-weight: bold; border: none; padding: 10px 15px; cursor: pointer; }
+</style>
+
+<!-- [Map and Docking Logic Remains the same] -->
+
+<!-- Updated Report Interface with Property List -->
+<div id="report-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:9999; padding:20px; overflow-y:auto;">
+    <h2 style="color:#d4af37; border-bottom: 2px solid #d4af37;">FINAL SEARCH REPORT & EVIDENCE LOG</h2>
+    
+    <div id="k9-log-body" style="font-family:monospace; background:#111; padding:15px; color:#0f0; margin-bottom:20px;"></div>
+
+    <div style="background:#1a1a1a; padding:15px; border:1px solid #333; margin-bottom:20px;">
+        <h3 style="color:#d4af37; margin-top:0;">FOUND PROPERTY / EVIDENCE LIST</h3>
+        <input type="text" id="prop-desc" class="property-input" placeholder="Item Description (e.g., 'Blue Backpack', 'Cell Phone')">
+        <button class="add-prop-btn" onclick="addProperty()">+ ADD TO REPORT</button>
+        <ul id="prop-list" style="color:#fff; padding-left:20px;"></ul>
+    </div>
+
+    <div style="display:flex; gap:10px;">
+        <button onclick="saveEnhancedPDF()" style="background:#d4af37; color:#000; padding:20px; font-weight:bold; flex:1;">PRINT PDF FOR COURT</button>
+        <button onclick="location.reload()" style="background:#444; color:#fff; padding:20px; flex:1;">WIPE SESSION</button>
+    </div>
+</div>
+
+<script>
+    let propertyItems = [];
+
+    function addProperty() {
+        const desc = document.getElementById('prop-desc').value;
+        if(desc) {
+            propertyItems.push(desc);
+            const li = document.createElement('li');
+            li.textContent = desc;
+            document.getElementById('prop-list').appendChild(li);
+            document.getElementById('prop-desc').value = '';
+        }
+    }
+
+    function saveEnhancedPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.setFont("courier", "bold");
+        doc.text("TACTICAL SEARCH INCIDENT REPORT", 10, 10);
+        doc.setFontSize(10);
+        
+        let y = 25;
+        doc.text("--- SEARCH LOG ---", 10, y); y += 10;
+        k9ActivityLog.forEach(item => {
+            doc.text(`[${item.time}] ${item.action} @ GPS: ${item.lat}, ${item.lng}`, 10, y);
+            y += 8;
+        });
+
+        y += 10;
+        doc.text("--- EVIDENCE / PROPERTY RECOVERED ---", 10, y); y += 10;
+        if(propertyItems.length === 0) doc.text("None Reported.", 10, y);
+        propertyItems.forEach(item => {
+            doc.text(`• ${item}`, 10, y);
+            y += 8;
+        });
+
+        doc.setFontSize(8);
+        doc.text("CREATED BY RETIRED DEPUTY SHERIFF EARL A. WOOD", 10, 285);
+        doc.save(`Tactical_Report_${new Date().getTime()}.pdf`);
+    }
+</script>
