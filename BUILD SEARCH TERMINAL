@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MATS TACTICAL - AMHERST/LYNCHBURG</title>
+    <!-- Leaflet Core -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Leaflet Draw (Perimeter Tools) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    
+    <!-- Geocoder (Address Search) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; font-family: 'Arial Narrow', sans-serif; }
+        #map { width: 100%; height: 100%; }
+
+        /* FLOATING FLUORESCENT ORANGE WIND ARROW */
+        #wind-container {
+            position: absolute; top: 70px; right: 20px; z-index: 1000;
+            text-align: center; pointer-events: none;
+        }
+        #wind-arrow {
+            font-size: 60px; color: #ff6600; /* Fluorescent Orange */
+            text-shadow: 0 0 10px #ff6600, 0 0 20px #000;
+            display: inline-block; transform: rotate(-45deg); /* Default NW */
+        }
+        .wind-text { color: #ff6600; font-weight: bold; font-size: 14px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 4px; }
+
+        /* PERIMETER RED CORNER DOTS (Fixed Mapping) */
+        .leaflet-editing-icon {
+            background: #ff0000 !important; 
+            border: 2px solid #fff !important;
+            width: 18px !important; height: 18px !important;
+            margin-left: -9px !important; margin-top: -9px !important;
+            border-radius: 50% !important;
+            box-shadow: 0 0 10px #ff0000;
+        }
+
+        /* TACTICAL HUD */
+        .hud {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            z-index: 1001; display: flex; gap: 10px;
+        }
+        .btn {
+            background: #1a1a1a; color: #d4af37; border: 2px solid #d4af37;
+            padding: 12px 20px; font-weight: bold; border-radius: 5px; cursor: pointer;
+            text-transform: uppercase; font-size: 12px;
+        }
+        .btn-reset { background: #800; color: #fff; border-color: #fff; }
+
+        /* MARKER STYLES */
+        .red-flag { font-size: 30px; filter: drop-shadow(2px 2px 2px #000); }
+    </style>
+</head>
+<body>
+
+<div id="wind-container">
+    <div id="wind-arrow">⬆</div>
+    <div class="wind-text">WIND: NW 8 MPH</div>
+</div>
+
+<div id="map"></div>
+
+<div class="hud">
+    <button class="btn" onclick="setMarker('LE')">BLUE LE</button>
+    <button class="btn" onclick="setMarker('K9')">LT BLUE K9</button>
+    <button class="btn" onclick="setMarker('FLAG')">🚩 RED FLAG</button>
+    <button class="btn btn-reset" onclick="resetAll()">RESET ALL</button>
+</div>
+
+<script>
+    window.onload = function() {
+        // 1. Initialize Map
+        var map = L.map('map', { zoomControl: false, center: [37.4137, -79.1422], zoom: 13 });
+        
+        // 2. Satellite Layer
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(map);
+
+        // 3. Address Search Box
+        L.Control.geocoder({ position: 'topleft', placeholder: 'SEARCH ADDRESS...' }).addTo(map);
+
+        var searchers = L.layerGroup().addTo(map);
+        var perimeterGroup = new L.FeatureGroup().addTo(map);
+        var currentType = 'LE';
+
+        // 4. Perimeter Tools (Red Lines)
+        var drawControl = new L.Control.Draw({
+            edit: { featureGroup: perimeterGroup },
+            draw: {
+                polygon: { shapeOptions: { color: '#ff0000', weight: 4, fillOpacity: 0.2 } },
+                rectangle: { shapeOptions: { color: '#ff0000', weight: 4 } },
+                circle: false, polyline: false, marker: false, circlemarker: false
+            }
+        });
+        map.addControl(drawControl);
+
+        map.on(L.Draw.Event.CREATED, function (e) {
+            perimeterGroup.addLayer(e.layer);
+        });
+
+        // 5. Tactical Marker Placement
+        window.setMarker = function(type) { currentType = type; };
+
+        map.on('click', function(e) {
+            var marker;
+            if (currentType === 'FLAG') {
+                marker = L.marker(e.latlng, {
+                    icon: L.divIcon({ className: 'red-flag', html: '🚩', iconAnchor: [10, 20] })
+                });
+            } else if (currentType === 'K9') {
+                marker = L.circleMarker(e.latlng, { 
+                    radius: 12, fillColor: '#add8e6', color: '#0000ff', weight: 3, fillOpacity: 1 
+                });
+            } else {
+                marker = L.circleMarker(e.latlng, { 
+                    radius: 12, fillColor: '#0000ff', color: '#fff', weight: 3, fillOpacity: 1 
+                });
+            }
+
+            // Remove Searcher Logic (Double Click)
+            marker.on('dblclick', function() { searchers.removeLayer(marker); });
+            searchers.addLayer(marker);
+        });
+
+        // 6. Reset Function
+        window.resetAll = function() {
+            if(confirm("Confirm: Clear Perimeter and All Searchers?")) {
+                perimeterGroup.clearLayers();
+                searchers.clearLayers();
+            }
+        };
+
+        // 7. Compass / GPS Location
+        map.locate({setView: true, watch: true, enableHighAccuracy: true});
+    };
+</script>
+
+<div style="position: absolute; bottom: 5px; width: 100%; text-align: center; color: #d4af37; font-size: 10px; z-index: 2000; pointer-events: none;">
+    App Created by Retired Deputy Sheriff EARL A. WOOD
+</div>
+
+</body>
+</html>
